@@ -18,70 +18,47 @@ def create_reservation(
 
     headers = {
         "Host": "portal.sejong.ac.kr",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     }
 
     cookies = {
         "chknos": "false",
     }
 
-    url1 = "https://portal.sejong.ac.kr/jsp/login/loginSSL.jsp?rtUrl=portal.sejong.ac.kr/comm/member/user/ssoLoginProc.do"
-    r1 = s.get(url1, headers=headers)
+    headers["Referer"] = "https://portal.sejong.ac.kr"
 
-    WMONID = r1.cookies["WMONID"]
-    PO_JSESSIONID = r1.cookies["PO_JSESSIONID"]
-    PO1_JSESSIONID = r1.cookies["PO1_JSESSIONID"]
+    url1 = "https://portal.sejong.ac.kr/jsp/login/login_action.jsp"
 
-    cookies["WMONID"] = WMONID
-    cookies["PO_JSESSIONID"] = PO_JSESSIONID
-    cookies["PO1_JSESSIONID"] = PO1_JSESSIONID
-    headers["Referer"] = (
-        "https://portal.sejong.ac.kr/jsp/login/loginSSL.jsp?rtUrl=portal.sejong.ac.kr/comm/member/user/ssoLoginProc.do"
-    )
-    headers["Cookie"] = (
-        f"chknos=false; WMONID={WMONID}; PO_JSESSIONID={PO_JSESSIONID}; PO1_JSESSIONID={PO1_JSESSIONID}"
-    )
+    while True:
+        try:
+            r1 = s.post(
+                url1,
+                headers=headers,
+                cookies=cookies,
+                data={
+                    "mainLogin": "N",
+                    "rtUrl": "library.sejong.ac.kr",
+                    "id": id,
+                    "password": password,
+                },
+                timeout=0.2,
+            )
+            break
+        except requests.exceptions.Timeout:
+            pass
 
-    url2 = "https://portal.sejong.ac.kr/jsp/login/login_action.jsp"
-    r2 = s.post(
-        url2,
-        headers=headers,
-        cookies=cookies,
-        data={
-            "mainLogin": "Y",
-            "rtUrl": "portal.sejong.ac.kr/comm/member/user/ssoLoginProc.do",
-            "id": id,
-            "password": password,
-        },
-    )
-
-    if "ssotoken" not in r2.cookies:
+    if not "ssotoken" in r1.cookies:
         return 401, "로그인 실패"
 
-    cookies["ssotoken"] = r2.cookies["ssotoken"]
-    headers["Cookie"] = (
-        f'chknos=false; WMONID={WMONID}; PO_JSESSIONID={PO_JSESSIONID}; PO1_JSESSIONID={PO1_JSESSIONID}; ssotoken={r2.cookies["ssotoken"]}'
-    )
+    cookies["ssotoken"] = r1.cookies["ssotoken"]
+    headers["Cookie"] = f"chknos=false;"
 
-    url3 = "https://portal.sejong.ac.kr/user/index.do"
-    s.get(url3, headers=headers)
+    url2 = "http://library.sejong.ac.kr/sso/Login.ax"
+    s.get(url2, verify=False)
 
-    url4 = "https://portal.sejong.ac.kr/comm/member/user/ssoLoginProc.do"
-    s.get(url4, headers=headers, cookies=cookies)
+    url3 = "https://library.sejong.ac.kr/studyroom/Request.ax?roomId=" + str(room_id)
+    r3 = s.get(url3, verify=False)
 
-    url5 = "http://library.sejong.ac.kr/sso/Login.ax"
-    s.get(url5, verify=False)
-
-    url6 = "https://library.sejong.ac.kr/index.ax"
-    s.get(url6, verify=False)
-
-    url7 = "https://library.sejong.ac.kr/studyroom/Main.ax"
-    r7 = s.get(url7, verify=False)
-
-    url8 = "https://library.sejong.ac.kr/studyroom/Request.ax?roomId=" + str(room_id)
-    r8 = s.get(url8, verify=False)
-
-    soup = bs.BeautifulSoup(r8.text, "html.parser")
+    soup = bs.BeautifulSoup(r3.text, "html.parser")
 
     data = {}
 
@@ -105,19 +82,16 @@ def create_reservation(
 
     # print(data)
 
-    r9 = s.post(
+    r4 = s.post(
         "https://library.sejong.ac.kr/studyroom/BookingProcess.axa",
         data=data,
         verify=False,
     )
 
-    print(r9.headers)
-    print(r9.text)
-
-    if "true" in r9.headers.get("X-JSON"):
+    if "true" in r4.headers.get("X-JSON"):
         return 200, {"result": "예약이 완료되었습니다."}
     else:
-        return 400, {"error": r9.text.strip()}
+        return 400, {"error": r4.text.strip()}
 
 
 def lambda_handler(event, context):
