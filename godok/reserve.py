@@ -1,4 +1,5 @@
 import json
+import re
 
 import requests
 from bs4 import BeautifulSoup
@@ -26,7 +27,10 @@ def reserve(id, password, shInfoId, bkCode, bkAreaCode):
     if response.history:
         response = session.get(RESERVE_CHECK_API_ROOT + "&shInfoId=" + shInfoId)
         if response.history:
-            return "예약 실패"
+            alert_re = r"alert\((.*)\)"
+            alert = re.findall(alert_re, response.text)
+            error = alert[-1].replace('"', "").strip()
+            return error if error else "예약 실패"
         soup = BeautifulSoup(response.text, "html.parser")
         opTermId = soup.find("input", {"id": "opTermId"}).get("value")
 
