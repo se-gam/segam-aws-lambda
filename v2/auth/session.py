@@ -1,8 +1,11 @@
 import requests
+import urllib3
 from requests import Session
+from urllib3.exceptions import InsecureRequestWarning
 
 from .errors import PortalLoginError, SejongServerNotAvailableError
 
+urllib3.disable_warnings(InsecureRequestWarning)
 class SejongPortalSession:
     PORTAL_AUTH_URL = "https://portal.sejong.ac.kr/jsp/login/login_action.jsp"
     MAX_RETRIES = 3
@@ -37,6 +40,10 @@ class SejongPortalSession:
             except requests.exceptions.RequestException as e:
                 print(f"요청 오류 발생: {e} 재시도...{i+1}")
         raise SejongServerNotAvailableError
+
+    def library_login(self):
+        """도서관 SSO 로그인"""
+        self.get("http://library.sejong.ac.kr/sso/Login.ax")
 
     def login(self, id, password):
         data = {
