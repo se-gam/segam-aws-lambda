@@ -1,27 +1,13 @@
-import sys
-import os
 import json
 
-import requests
-import urllib3
-from urllib3.exceptions import InsecureRequestWarning
-
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from auth.errors import PortalLoginError, SejongServerNotAvailableError
-from auth.session import SejongPortalSession
-
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-LIBRARY_LOGIN_URL = "http://library.sejong.ac.kr/sso/Login.ax"
-LIBRARY_USER_FIND_URL = "https://library.sejong.ac.kr/studyroom/UserFind.axa"
+from ..auth.errors import PortalLoginError, SejongServerNotAvailableError
+from ..auth.session import SejongPortalSession
+from .common import LIBRARY_USER_FIND_URL
 
 
 def validate_user_availability(id, password, user_name, student_id, year, month, day):
     sessionService = SejongPortalSession(id, password)
-    sessionService.get(LIBRARY_LOGIN_URL)
+    sessionService.library_login()
 
     r = sessionService.post(
         LIBRARY_USER_FIND_URL,
@@ -62,4 +48,3 @@ def lambda_handler(event, context):
             "statusCode": e.status_code,
             "body": json.dumps({"result": e.message}, ensure_ascii=False),
         }
-

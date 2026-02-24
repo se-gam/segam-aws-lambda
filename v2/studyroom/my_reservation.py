@@ -1,28 +1,13 @@
-import sys
-import os
-import json
-
 import bs4 as bs
-import requests
 
-import urllib3
-from urllib3.exceptions import InsecureRequestWarning
+from ..auth.session import SejongPortalSession
+from ..auth.session import SejongPortalSession
+from .common import LIBRARY_STUDYROOM_URL, STUDYROOM_BOOKING_DETAIL_URL, make_lambda_handler
 
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from auth.errors import PortalLoginError, SejongServerNotAvailableError
-from auth.session import SejongPortalSession
-
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-LIBRARY_LOGIN_URL = "http://library.sejong.ac.kr/sso/Login.ax"
-LIBRARY_STUDYROOM_URL = "https://library.sejong.ac.kr/studyroom/Main.ax"
 
 def get_my_reservations(id, password):
     sessionService = SejongPortalSession(id, password)
-    sessionService.get(LIBRARY_LOGIN_URL)
+    sessionService.library_login()
     r = sessionService.get(LIBRARY_STUDYROOM_URL)
     reservations = []
 
@@ -50,7 +35,7 @@ def get_my_reservations(id, password):
 
     for reservation in reservations:
         r4 = sessionService.post(
-            "https://library.sejong.ac.kr/studyroom/BookingDetail.axa",
+            STUDYROOM_BOOKING_DETAIL_URL,
             data={
                 "bookingId": reservation["booking_id"],
                 "ipid": reservation["ipid"],
@@ -97,19 +82,8 @@ def get_my_reservations(id, password):
 
     return 200, result
 
-def lambda_handler(event, context):
-    body = json.loads(event["body"])
-    id = body["student_id"]
-    password = body["password"]
 
-    try:
-        status_code, result = get_my_reservations(id, password)
-        return {
-            "statusCode": status_code,
-            "body": json.dumps({"result": result}, ensure_ascii=False),
-        }
-    except (PortalLoginError, SejongServerNotAvailableError) as e:
-        return {
-            "statusCode": e.status_code,
-            "body": json.dumps({"result": e.message}, ensure_ascii=False),
-        }
+lambda_handler = make_lambda_handler(
+    get_my_reservations,
+    ["student_id", "password"],
+)
