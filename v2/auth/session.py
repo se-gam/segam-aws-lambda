@@ -53,7 +53,7 @@ class SejongPortalSession:
                     headers=self.LOGIN_HEADERS,
                     cookies=self.LOGIN_COOKIES,
                     data=data,
-                    timeout=0.4,
+                    timeout=0.2,
                 )
                 if "ssotoken" in r1.cookies:
                     return
