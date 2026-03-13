@@ -7,7 +7,7 @@ from .common import LIBRARY_USER_FIND_URL
 
 def validate_user_availability(id, password, user_name, student_id, year, month, day):
     sessionService = SejongPortalSession(id, password)
-    sessionService.library_login()
+    sessionService.bridge_to_libseat()
 
     r = sessionService.post(
         LIBRARY_USER_FIND_URL,
@@ -21,7 +21,9 @@ def validate_user_availability(id, password, user_name, student_id, year, month,
         },
     )
 
-    data = json.loads(r.headers.get("X-JSON").replace("'", '"'))
+    x_json = r.headers.get("X-JSON", "{}")
+    data = json.loads(x_json.replace("'", '"'))
+
     if data.get("result") == "true":
         return 200, {"ipid": data.get("ipid")}
     else:

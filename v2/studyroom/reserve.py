@@ -1,52 +1,47 @@
 import json
 
-import bs4 as bs
-
-from ..auth.errors import PortalLoginError, SejongServerNotAvailableError
 from ..auth.session import SejongPortalSession
-from .common import STUDYROOM_RESERVE_URL, STUDYROOM_BOOKING_PROCESS_URL
+from .common import STUDYROOM_BOOKING_PROCESS_URL
 
 
 def create_reservation(
-    id, password, room_id, users, year, month, day, start_time, hours, purpose="공부"
+    id,
+    password,
+    room_id: int,
+    users,
+    year,
+    month,
+    day,
+    start_time,
+    hours,
+    purpose="공부",
 ):
     sessionService = SejongPortalSession(id, password)
-    sessionService.library_login()
 
-    r = sessionService.get(STUDYROOM_RESERVE_URL + str(room_id))
+    if not sessionService.bridge_to_libseat():
+        raise Exception("libseat login failed")
 
-    soup = bs.BeautifulSoup(r.text, "html.parser")
+    user_ids = "|".join(u["student_id"] for u in users)
+    user_names = "|".join(u["name"] for u in users)
 
-    data = {}
-
-    for x in soup.find("form", {"id": "frmMain"}).find_all("input"):
-        if x.get("name"):
-            data[x["name"]] = x.get("value") if x.get("value") else ""
-
-    for i, user in enumerate(users):
-        data[f"altPid{i+1}"] = user["student_id"]
-        data[f"name{i+1}"] = user["name"]
-        data[f"ipid{i+1}"] = user["ipid"]
-
-    data["year"] = year
-    data["month"] = month
-    data["day"] = day
-    data["startHour"] = start_time
-    data["closeTime"] = "22"
-    data["hours"] = hours
-    data["purpose"] = purpose
-    data["mode"] = "INSERT"
+    p2 = {
+        "userID": user_ids,
+        "userName": user_names,
+        "roomNo": room_id,
+        "reserveDate": year + month + day,
+        "startTime": start_time,
+        "useTime": str(60 * hours),
+    }
 
     r2 = sessionService.post(
         STUDYROOM_BOOKING_PROCESS_URL,
-        data=data,
+        data=p2,
     )
 
-    if "true" in r2.headers.get("X-JSON"):
-        return 200, {"result": "예약이 완료되었습니다."}
-    else:
-        return 400, {"error": r2.text.strip()}
+    if "<resultCode><![CDATA[0]]>" not in r2.text:
+        raise Exception("Reservation failed")
 
+    return 200, {"result": "예약이 완료되었습니다."}
 
 def lambda_handler(event, context):
     body = json.loads(event["body"])
@@ -66,9 +61,6 @@ def lambda_handler(event, context):
             id, password, room_id, users, year, month, day, start_time, hours, purpose
         )
         return {"statusCode": status_code, "body": json.dumps(result, ensure_ascii=False)}
+    except Exception as e:
+        return {"statusCode": 400, "body": json.dumps({"error": str(e)}, ensure_ascii=False)}
 
-    except (PortalLoginError, SejongServerNotAvailableError) as e:
-        return {
-            "statusCode": e.status_code,
-            "body": json.dumps({"result": e.message}, ensure_ascii=False),
-        }
